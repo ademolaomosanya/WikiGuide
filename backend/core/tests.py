@@ -1,10 +1,11 @@
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APISimpleTestCase, APITestCase
 
-from .models import WikimediaAccount
+from .models import LearningProgress, MentorRequest, OnboardingProfile, WikimediaAccount
 from .services.oauth import OAuthRequest
 
 
@@ -20,6 +21,19 @@ class ProjectGuideAPITests(APISimpleTestCase):
         self.assertTrue(response.data["projects"][0]["actions"])
         self.assertTrue(response.data["projects"][0]["steps"])
         self.assertTrue(response.data["projects"][0]["faqs"])
+
+    def test_project_catalog_lists_active_and_archived_project_families(self):
+        response = self.client.get("/api/projects/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["projects"]), 14)
+        self.assertEqual(response.data["projects"][0]["name"], "Wikipedia")
+        wikinews = next(
+            project
+            for project in response.data["projects"]
+            if project["name"] == "Wikinews"
+        )
+        self.assertEqual(wikinews["status"], "archived")
 
 
 class AuthenticationAPITests(APITestCase):
@@ -86,3 +100,207 @@ class AuthenticationAPITests(APITestCase):
         me_response = self.client.get("/api/auth/me/")
         self.assertTrue(me_response.data["authenticated"])
         self.assertEqual(me_response.data["user"]["username"], "Example Editor")
+
+
+class DashboardAPITests(APITestCase):
+    def test_dashboard_requires_authentication(self):
+        response = self.client.get("/api/dashboard/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_dashboard_returns_real_user_totals(self):
+        user = get_user_model().objects.create_user(username="wikimedia_987")
+        WikimediaAccount.objects.create(
+            user=user,
+            wikimedia_user_id="987",
+            username="Dashboard Editor",
+            edit_count=126,
+        )
+        LearningProgress.objects.create(
+            user=user,
+            module_slug="add-a-citation",
+            completed=True,
+            points=25,
+        )
+        LearningProgress.objects.create(
+            user=user,
+            module_slug="visual-editor",
+            completed=False,
+            points=10,
+        )
+        self.client.force_authenticate(user=user)
+
+        response = self.client.get("/api/dashboard/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["username"], "Dashboard Editor")
+        self.assertEqual(
+            response.data["stats"],
+            {
+                "wikimediaEdits": 126,
+                "totalPoints": 35,
+                "completedModules": 1,
+                "activeModules": 1,
+            },
+        )
+        self.assertEqual(len(response.data["recentProgress"]), 2)
+
+
+class LearningFlowAPITests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="learner")
+
+    def test_learning_flow_requires_authentication(self):
+        response = self.client.get("/api/learning/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_first_lesson_in_each_path_is_available(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/learning/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["paths"]), 4)
+        for path in response.data["paths"]:
+            self.assertEqual(path["lessons"][0]["state"], "available")
+            self.assertEqual(path["lessons"][1]["state"], "locked")
+        self.assertFalse(response.data["leaderboard"]["unlocked"])
+
+    def test_locked_lesson_cannot_be_completed(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            "/api/learning/lessons/wikipedia-use-the-visual-editor/complete/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertFalse(LearningProgress.objects.filter(user=self.user).exists())
+
+    def test_completing_lesson_awards_xp_and_unlocks_next(self):
+        self.client.force_authenticate(user=self.user)
+        lesson_url = (
+            "/api/learning/lessons/"
+            "wikipedia-practice-in-your-sandbox/complete/"
+        )
+
+        response = self.client.post(lesson_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        wikipedia = response.data["paths"][0]
+        self.assertEqual(wikipedia["lessons"][0]["state"], "completed")
+        self.assertEqual(wikipedia["lessons"][1]["state"], "available")
+        self.assertEqual(response.data["stats"]["totalPoints"], 20)
+        self.assertTrue(response.data["leaderboard"]["unlocked"])
+
+        repeated = self.client.post(lesson_url)
+
+        self.assertEqual(repeated.data["stats"]["totalPoints"], 20)
+        self.assertEqual(LearningProgress.objects.filter(user=self.user).count(), 1)
+
+
+class MentorshipAPITests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="mentee")
+
+    def test_mentorship_requires_authentication(self):
+        response = self.client.get("/api/mentorship/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_user_can_create_a_mentor_request(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            "/api/mentorship/",
+            {
+                "project_slug": "wikipedia",
+                "topic": "sources",
+                "experience_level": "new",
+                "goals": "Learn to cite reliable sources.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["request"]["status"], "pending")
+        self.assertEqual(response.data["request"]["projectName"], "Wikipedia")
+        self.assertEqual(MentorRequest.objects.filter(user=self.user).count(), 1)
+
+    def test_user_cannot_create_two_pending_requests(self):
+        MentorRequest.objects.create(
+            user=self.user,
+            project_slug="wikidata",
+            topic="getting-started",
+            experience_level="beginner",
+        )
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            "/api/mentorship/",
+            {
+                "project_slug": "commons",
+                "topic": "community",
+                "experience_level": "new",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(MentorRequest.objects.filter(user=self.user).count(), 1)
+
+
+class OnboardingAPITests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="newcomer")
+
+    def test_onboarding_requires_authentication(self):
+        response = self.client.get("/api/onboarding/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_new_user_has_incomplete_onboarding(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/onboarding/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"completed": False, "profile": None})
+
+    def test_user_can_complete_onboarding(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            "/api/onboarding/",
+            {
+                "primaryGoal": "share-media",
+                "preferredProject": "commons",
+                "experienceLevel": "new",
+                "supportPreference": "community",
+                "dismissed": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["completed"])
+        self.assertEqual(response.data["profile"]["preferredProject"], "commons")
+        profile = OnboardingProfile.objects.get(user=self.user)
+        self.assertEqual(profile.primary_goal, "share-media")
+
+    def test_onboarding_rejects_unknown_choices(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            "/api/onboarding/",
+            {
+                "primaryGoal": "become-famous",
+                "preferredProject": "wikipedia",
+                "experienceLevel": "new",
+                "supportPreference": "self-guided",
+                "dismissed": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

@@ -3,18 +3,30 @@ from urllib.parse import urlencode
 from django.conf import settings
 from django.contrib.auth import get_user_model, login, logout
 from django.db import transaction
+from django.db.models import Count, Q, Sum
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse, HttpResponseRedirect
 from django.middleware.csrf import get_token
 from django.utils.crypto import constant_time_compare
 from django.utils.dateparse import parse_datetime
+from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import WikimediaAccount
+from .models import LearningProgress, MentorRequest, OnboardingProfile, WikimediaAccount
+from .serializers import MentorRequestSerializer, OnboardingProfileSerializer
 from .services.guides import get_project_guides
+from .services.learning import (
+    LessonLockedError,
+    LessonNotFoundError,
+    complete_lesson,
+    get_learning_flow,
+)
 from .services import oauth
+from .services.projects import get_wikimedia_projects
 
 OAUTH_STATE_SESSION_KEY = "wikimedia_oauth_state"
 OAUTH_VERIFIER_SESSION_KEY = "wikimedia_oauth_verifier"
@@ -32,6 +44,107 @@ def health(request):
 @api_view(["GET"])
 def project_guides(request):
     return Response({"projects": get_project_guides()})
+
+
+@api_view(["GET"])
+def projects(request):
+    return Response({"projects": get_wikimedia_projects()})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def dashboard(request):
+    progress = LearningProgress.objects.filter(user=request.user)
+    totals = progress.aggregate(
+        total_points=Coalesce(Sum("points"), 0),
+        completed_modules=Count("id", filter=Q(completed=True)),
+        active_modules=Count("id", filter=Q(completed=False)),
+    )
+    account = getattr(request.user, "wikimedia_account", None)
+
+    return Response(
+        {
+            "username": account.username if account else request.user.get_username(),
+            "stats": {
+                "wikimediaEdits": account.edit_count if account else 0,
+                "totalPoints": totals["total_points"],
+                "completedModules": totals["completed_modules"],
+                "activeModules": totals["active_modules"],
+            },
+            "recentProgress": [
+                {
+                    "moduleSlug": item.module_slug,
+                    "completed": item.completed,
+                    "points": item.points,
+                    "updatedAt": item.updated_at,
+                }
+                for item in progress[:5]
+            ],
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def learning_flow(request):
+    return Response(get_learning_flow(request.user))
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def learning_lesson_complete(request, lesson_slug):
+    try:
+        return Response(complete_lesson(request.user, lesson_slug))
+    except LessonNotFoundError as exc:
+        return Response({"detail": str(exc)}, status=404)
+    except LessonLockedError as exc:
+        return Response({"detail": str(exc)}, status=409)
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def mentorship(request):
+    if request.method == "GET":
+        current = MentorRequest.objects.filter(user=request.user).first()
+        return Response(
+            {"request": MentorRequestSerializer(current).data if current else None}
+        )
+
+    if MentorRequest.objects.filter(user=request.user, status="pending").exists():
+        return Response(
+            {"detail": "You already have a mentor request awaiting a match."},
+            status=409,
+        )
+
+    serializer = MentorRequestSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    mentor_request = serializer.save(user=request.user)
+    return Response(
+        {"request": MentorRequestSerializer(mentor_request).data},
+        status=201,
+    )
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def onboarding(request):
+    profile = OnboardingProfile.objects.filter(user=request.user).first()
+    if request.method == "GET":
+        return Response(
+            {
+                "completed": profile is not None,
+                "profile": OnboardingProfileSerializer(profile).data if profile else None,
+            }
+        )
+
+    is_new = profile is None
+    serializer = OnboardingProfileSerializer(instance=profile, data=request.data)
+    serializer.is_valid(raise_exception=True)
+    profile = serializer.save(user=request.user, completed_at=timezone.now())
+    return Response(
+        {"completed": True, "profile": OnboardingProfileSerializer(profile).data},
+        status=201 if is_new else 200,
+    )
 
 
 @require_GET

@@ -7,7 +7,6 @@ import { useProjectGuides } from "../hooks/useProjectGuides";
 export function HomePage() {
   const { guides, isLoading, error, retry } = useProjectGuides();
   const [activeProject, setActiveProject] = useState("Wikipedia");
-  const [projectsOpen, setProjectsOpen] = useState(false);
 
   useEffect(() => {
     if (guides.length === 0) return;
@@ -49,7 +48,6 @@ export function HomePage() {
 
   const chooseProject = (project: string) => {
     setActiveProject(project);
-    setProjectsOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -107,32 +105,6 @@ export function HomePage() {
         </section>
       </div>
 
-      <button
-        className="discover-button"
-        type="button"
-        aria-expanded={projectsOpen}
-        aria-controls="project-picker"
-        onClick={() => setProjectsOpen((open) => !open)}
-      >
-        <span aria-hidden="true" />
-        Discover Wikimedia Projects
-      </button>
-
-      {projectsOpen && (
-        <div className="project-picker" id="project-picker">
-          <p>Explore a project</p>
-          {projects.map((project) => (
-            <button
-              type="button"
-              className={project === activeProject ? "is-active" : ""}
-              key={project}
-              onClick={() => chooseProject(project)}
-            >
-              {project}
-            </button>
-          ))}
-        </div>
-      )}
     </main>
   );
 }
