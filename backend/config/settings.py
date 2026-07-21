@@ -81,3 +81,23 @@ CORS_ALLOWED_ORIGINS = [
     for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",")
     if origin.strip()
 ]
+CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
+
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+WIKIMEDIA_OAUTH_CLIENT_ID = os.getenv("WIKIMEDIA_OAUTH_CLIENT_ID", "")
+WIKIMEDIA_OAUTH_CLIENT_SECRET = os.getenv("WIKIMEDIA_OAUTH_CLIENT_SECRET", "")
+WIKIMEDIA_OAUTH_CALLBACK_URL = os.getenv(
+    "WIKIMEDIA_OAUTH_CALLBACK_URL",
+    "http://localhost:8000/api/auth/wikimedia/callback/",
+)
+WIKIMEDIA_USER_AGENT = os.getenv(
+    "WIKIMEDIA_USER_AGENT",
+    "WikiGuide/0.1 (https://github.com/your-org/wikiguide; contact@example.com)",
+)
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "False").lower() == "true"
+CSRF_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
