@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 
 import { useWikimediaProjects } from "../hooks/useWikimediaProjects";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const categoryOrder = [
   "Reference",
@@ -13,6 +14,7 @@ const categoryOrder = [
 ];
 
 export function ProjectsPage() {
+  const { t } = useLanguage();
   const { projects, isLoading, error } = useWikimediaProjects();
   const [query, setQuery] = useState("");
   const filteredProjects = useMemo(() => {
@@ -28,7 +30,7 @@ export function ProjectsPage() {
   if (isLoading) {
     return (
       <main className="status-page" aria-live="polite">
-        <p>Loading Wikimedia projects…</p>
+        <p>{t("Loading Wikimedia projects…")}</p>
       </main>
     );
   }
@@ -44,14 +46,13 @@ export function ProjectsPage() {
   return (
     <main className="projects-page">
       <header className="projects-intro">
-        <p className="dashboard-kicker">Explore the movement</p>
-        <h1>Discover Wikimedia projects</h1>
+        <p className="dashboard-kicker">{t("Explore the movement")}</p>
+        <h1>{t("Discover Wikimedia projects")}</h1>
         <p>
-          Find the free knowledge project that matches what you want to learn,
-          preserve, organize, or contribute.
+          {t("Find the free knowledge project that matches what you want to learn, preserve, organize, or contribute.")}
         </p>
         <label className="project-search">
-          <span>Search projects</span>
+          <span>{t("Search projects")}</span>
           <input
             type="search"
             value={query}
@@ -64,8 +65,8 @@ export function ProjectsPage() {
       <div className="project-catalog" aria-live="polite">
         {filteredProjects.length === 0 ? (
           <div className="catalog-empty">
-            <h2>No matching projects</h2>
-            <p>Try a broader name, category, or contribution type.</p>
+            <h2>{t("No matching projects")}</h2>
+            <p>{t("Try a broader name, category, or contribution type.")}</p>
           </div>
         ) : (
           categoryOrder.map((category) => {
@@ -77,7 +78,7 @@ export function ProjectsPage() {
             return (
               <section className="catalog-section" key={category}>
                 <div className="catalog-heading">
-                  <h2>{category}</h2>
+                  <h2>{t(category)}</h2>
                   <span>{categoryProjects.length}</span>
                 </div>
                 <div className="catalog-grid">
@@ -95,11 +96,11 @@ export function ProjectsPage() {
                       <div className="project-card-copy">
                         <div className="project-card-title">
                           <h3>{project.name}</h3>
-                          {project.status === "archived" && <span>Archived</span>}
+                          {project.status === "archived" && <span>{t("Archived")}</span>}
                         </div>
-                        <p>{project.description}</p>
+                        <p>{t(project.description)}</p>
                         <a href={project.url} target="_blank" rel="noreferrer">
-                          {project.status === "archived" ? "View archive" : "Visit project"}
+                          {t(project.status === "archived" ? "View archive" : "Visit project")}
                           <span aria-hidden="true"> ↗</span>
                         </a>
                       </div>

@@ -6,9 +6,13 @@ import type {
   LearningFlowResponse,
   MentorRequestInput,
   MentorshipResponse,
+  NotificationStatusResponse,
   OnboardingInput,
   OnboardingResponse,
   ProjectGuidesResponse,
+  SuggestedEditResponse,
+  SuggestedEditTaskType,
+  SuggestedEditTopic,
   WikimediaProjectsResponse,
 } from "../types/api";
 
@@ -48,6 +52,23 @@ export async function getWikimediaProjects(
   return response.json() as Promise<WikimediaProjectsResponse>;
 }
 
+export async function getSuggestedEdit(
+  task: SuggestedEditTaskType,
+  topic: SuggestedEditTopic,
+  offset = 0,
+  signal?: AbortSignal,
+): Promise<SuggestedEditResponse> {
+  const params = new URLSearchParams({ task, topic, offset: String(offset) });
+  const response = await fetch(`${API_BASE_URL}/suggested-edits/?${params}`, { signal });
+
+  if (!response.ok) {
+    const result = (await response.json().catch(() => null)) as { detail?: string } | null;
+    throw new Error(result?.detail ?? "A suggested edit could not be loaded.");
+  }
+
+  return response.json() as Promise<SuggestedEditResponse>;
+}
+
 export function getWikimediaLoginUrl(): string {
   return `${API_BASE_URL}/auth/wikimedia/login/`;
 }
@@ -65,7 +86,22 @@ export async function getCurrentUser(signal?: AbortSignal): Promise<AuthResponse
   return response.json() as Promise<AuthResponse>;
 }
 
-async function getCSRFToken(): Promise<string> {
+export async function getNotificationStatus(
+  signal?: AbortSignal,
+): Promise<NotificationStatusResponse> {
+  const response = await fetch(`${API_BASE_URL}/notifications/`, {
+    credentials: "include",
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Notification status request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<NotificationStatusResponse>;
+}
+
+export async function getCSRFToken(): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/auth/csrf/`, {
     credentials: "include",
   });

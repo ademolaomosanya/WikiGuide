@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import LearningProgress, MentorRequest, OnboardingProfile, WikimediaAccount
+from .models import (
+    ChatResource,
+    LearningProgress,
+    MentorRequest,
+    OnboardingProfile,
+    WikimediaAccount,
+)
 
 
 @admin.register(LearningProgress)
@@ -35,3 +41,10 @@ class OnboardingProfileAdmin(admin.ModelAdmin):
         "completed_at",
     )
     list_filter = ("preferred_project", "experience_level", "support_preference")
+
+
+@admin.register(ChatResource)
+class ChatResourceAdmin(admin.ModelAdmin):
+    list_display = ("title", "project", "is_active", "updated_at")
+    list_filter = ("project", "is_active")
+    search_fields = ("title", "summary", "content", "project")

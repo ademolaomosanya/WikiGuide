@@ -2,9 +2,17 @@ import { useEffect, useState } from "react";
 
 import { FAQList } from "../components/FAQList";
 import { ProjectRail } from "../components/ProjectRail";
+import { WikipediaQuickAccess } from "../components/WikipediaQuickAccess";
 import { useProjectGuides } from "../hooks/useProjectGuides";
+import { useLanguage } from "../i18n/LanguageContext";
+import type { AuthUser } from "../types/api";
 
-export function HomePage() {
+interface HomePageProps {
+  user: AuthUser | null;
+}
+
+export function HomePage({ user }: HomePageProps) {
+  const { t } = useLanguage();
   const { guides, isLoading, error, retry } = useProjectGuides();
   const [activeProject, setActiveProject] = useState("Wikipedia");
 
@@ -18,7 +26,7 @@ export function HomePage() {
   if (isLoading) {
     return (
       <main className="status-page" aria-live="polite">
-        <p>Loading Wikimedia project guides…</p>
+        <p>{t("Loading Wikimedia project guides…")}</p>
       </main>
     );
   }
@@ -28,7 +36,7 @@ export function HomePage() {
       <main className="status-page" role="alert">
         <p>{error}</p>
         <button type="button" onClick={retry}>
-          Try again
+          {t("Try again")}
         </button>
       </main>
     );
@@ -39,7 +47,7 @@ export function HomePage() {
   if (!guide) {
     return (
       <main className="status-page" role="status">
-        <p>No project guides are available yet.</p>
+        <p>{t("No project guides are available yet.")}</p>
       </main>
     );
   }
@@ -65,25 +73,27 @@ export function HomePage() {
             {guide.mark}
           </div>
           <div>
-            <h1>{guide.title}</h1>
-            <p>{guide.description}</p>
+            <h1>{t(guide.title)}</h1>
+            <p>{t(guide.description)}</p>
           </div>
         </header>
 
+        {guide.slug === "wikipedia" && <WikipediaQuickAccess user={user} />}
+
         <section className="content-section" aria-labelledby="possibilities-title">
-          <h2 id="possibilities-title">What you can do here</h2>
+          <h2 id="possibilities-title">{t("What you can do here")}</h2>
           <div className="action-grid">
             {guide.actions.map((action) => (
               <article className="action-card" key={action.title}>
-                <h3>{action.title}</h3>
-                <p>{action.body}</p>
+                <h3>{t(action.title)}</h3>
+                <p>{t(action.body)}</p>
               </article>
             ))}
           </div>
         </section>
 
         <section className="content-section steps-section" aria-labelledby="steps-title">
-          <h2 id="steps-title">How to, step by step</h2>
+          <h2 id="steps-title">{t("How to, step by step")}</h2>
           <ol className="step-list">
             {guide.steps.map((step, index) => (
               <li key={step.title}>
@@ -91,8 +101,8 @@ export function HomePage() {
                   {index + 1}
                 </span>
                 <div>
-                  <h3>{step.title}</h3>
-                  <p>{step.body}</p>
+                  <h3>{t(step.title)}</h3>
+                  <p>{t(step.body)}</p>
                 </div>
               </li>
             ))}
@@ -100,7 +110,7 @@ export function HomePage() {
         </section>
 
         <section className="content-section faq-section" aria-labelledby="faq-title">
-          <h2 id="faq-title">Quick FAQ</h2>
+          <h2 id="faq-title">{t("Quick FAQ")}</h2>
           <FAQList items={guide.faqs} />
         </section>
       </div>

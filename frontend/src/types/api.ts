@@ -41,6 +41,12 @@ export interface AuthResponse {
   user: AuthUser | null;
 }
 
+export interface NotificationStatusResponse {
+  available: boolean;
+  hasUnread: boolean | null;
+  url: string;
+}
+
 export interface CSRFTokenResponse {
   csrfToken: string;
 }
@@ -187,4 +193,23 @@ export interface OnboardingInput {
   experienceLevel: string;
   supportPreference: string;
   dismissed: boolean;
+}
+
+export type SuggestedEditTaskType = "copyedit" | "references" | "links" | "expand";
+export type SuggestedEditTopic = "all" | "culture" | "history" | "science" | "society";
+
+export interface SuggestedEditResponse {
+  taskType: SuggestedEditTaskType;
+  taskName: string;
+  guidance: string;
+  topic: SuggestedEditTopic;
+  topicMatched: boolean;
+  isFallback: boolean;
+  nextOffset: number;
+  article: {
+    title: string;
+    excerpt: string;
+    url: string;
+    editUrl: string;
+  };
 }

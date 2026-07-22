@@ -7,6 +7,58 @@ from rest_framework.test import APISimpleTestCase, APITestCase
 
 from .models import LearningProgress, MentorRequest, OnboardingProfile, WikimediaAccount
 from .services.oauth import OAuthRequest
+from .services.wikimedia import WikimediaServiceError
+
+
+class SuggestedEditsAPITests(APISimpleTestCase):
+    @patch("core.views.get_suggested_edit")
+    def test_returns_a_live_wikipedia_task(self, get_suggestion):
+        get_suggestion.return_value = {
+            "taskType": "references",
+            "taskName": "Add a reference",
+            "guidance": "Add a reliable source.",
+            "topic": "science",
+            "topicMatched": True,
+            "isFallback": False,
+            "nextOffset": 1,
+            "article": {
+                "title": "Example",
+                "excerpt": "An article needing a source.",
+                "url": "https://fr.wikipedia.org/wiki/Example",
+                "editUrl": "https://fr.wikipedia.org/wiki/Example?veaction=edit",
+            },
+        }
+
+        response = self.client.get(
+            "/api/suggested-edits/?task=references&topic=science&offset=0"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["article"]["title"], "Example")
+        get_suggestion.assert_called_once_with("references", "science", 0)
+
+    @patch("core.views.get_suggested_edit")
+    def test_uses_a_safe_demo_task_when_wikipedia_is_unavailable(self, get_suggestion):
+        get_suggestion.side_effect = WikimediaServiceError("rate limited")
+
+        response = self.client.get(
+            "/api/suggested-edits/?task=references&topic=science"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["isFallback"])
+        self.assertEqual(response.data["article"]["title"], "Wikipedia practice sandbox")
+        self.assertIn("Bac_%C3%A0_sable", response.data["article"]["editUrl"])
+
+    def test_rejects_unknown_filters(self):
+        response = self.client.get("/api/suggested-edits/?task=write-an-opinion")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_rejects_invalid_offset(self):
+        response = self.client.get("/api/suggested-edits/?offset=next")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 class ProjectGuideAPITests(APISimpleTestCase):
@@ -100,6 +152,44 @@ class AuthenticationAPITests(APITestCase):
         me_response = self.client.get("/api/auth/me/")
         self.assertTrue(me_response.data["authenticated"])
         self.assertEqual(me_response.data["user"]["username"], "Example Editor")
+        self.assertEqual(
+            self.client.session["wikimedia_oauth_access_token"],
+            "temporary-access-token",
+        )
+
+
+class NotificationStatusAPITests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="message-reader")
+
+    def test_notification_status_requires_authentication(self):
+        response = self.client.get("/api/notifications/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_status_is_unavailable_without_an_oauth_token(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/notifications/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["available"], False)
+        self.assertIsNone(response.data["hasUnread"])
+
+    @patch("core.views.oauth.has_unread_notifications")
+    def test_status_reports_unread_notifications(self, has_unread_notifications):
+        has_unread_notifications.return_value = True
+        self.client.force_authenticate(user=self.user)
+        session = self.client.session
+        session["wikimedia_oauth_access_token"] = "server-side-token"
+        session.save()
+
+        response = self.client.get("/api/notifications/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["available"], True)
+        self.assertEqual(response.data["hasUnread"], True)
+        has_unread_notifications.assert_called_once_with("server-side-token")
 
 
 class DashboardAPITests(APITestCase):

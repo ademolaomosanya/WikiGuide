@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { Header } from "./components/Header";
+import { ChatToggle } from "./components/ChatToggle";
 import { useAuth } from "./hooks/useAuth";
 import { DashboardPage } from "./pages/DashboardPage";
 import { HomePage } from "./pages/HomePage";
@@ -36,8 +37,9 @@ export default function App() {
       ) : currentPath === "/projects" ? (
         <ProjectsPage />
       ) : (
-        <HomePage />
+        <HomePage user={auth.user} />
       )}
+      <ChatToggle user={auth.user} />
     </div>
   );
 }
