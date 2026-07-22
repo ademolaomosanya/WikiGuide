@@ -125,3 +125,20 @@ class OnboardingProfile(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user}: {self.preferred_project} onboarding"
+
+
+class ChatResource(models.Model):
+    title = models.CharField(max_length=200)
+    summary = models.TextField()
+    content = models.TextField()
+    project = models.CharField(max_length=80)
+    url = models.URLField(max_length=500)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("title",)
+
+    def __str__(self) -> str:
+        return self.title

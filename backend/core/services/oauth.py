@@ -10,6 +10,7 @@ from django.conf import settings
 AUTHORIZE_URL = "https://meta.wikimedia.org/w/rest.php/oauth2/authorize"
 ACCESS_TOKEN_URL = "https://meta.wikimedia.org/w/rest.php/oauth2/access_token"
 PROFILE_URL = "https://meta.wikimedia.org/w/rest.php/oauth2/resource/profile"
+FRENCH_WIKIPEDIA_API_URL = "https://fr.wikipedia.org/w/api.php"
 
 
 class WikimediaOAuthError(Exception):
@@ -98,3 +99,34 @@ def fetch_profile(access_token: str) -> dict:
     if not profile.get("sub") or not profile.get("username"):
         raise WikimediaOAuthError("Wikimedia returned an incomplete profile")
     return profile
+
+
+def has_unread_notifications(access_token: str) -> bool:
+    """Return whether the authenticated user has an unread French Wikipedia notification."""
+    try:
+        response = requests.get(
+            FRENCH_WIKIPEDIA_API_URL,
+            params={
+                "action": "query",
+                "meta": "notifications",
+                "notprop": "list",
+                "notfilter": "!read",
+                "notlimit": 1,
+                "format": "json",
+                "formatversion": 2,
+            },
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "User-Agent": settings.WIKIMEDIA_USER_AGENT,
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except (requests.RequestException, ValueError) as exc:
+        raise WikimediaOAuthError("Wikimedia notification request failed") from exc
+
+    if payload.get("error"):
+        raise WikimediaOAuthError("Wikimedia rejected the notification request")
+    notifications = payload.get("query", {}).get("notifications", {}).get("list", [])
+    return bool(notifications)

@@ -1,6 +1,7 @@
 import type { MouseEvent } from "react";
 
 import { getWikimediaLoginUrl } from "../api/client";
+import { useLanguage } from "../i18n/LanguageContext";
 import type { AuthUser } from "../types/api";
 
 interface HeaderProps {
@@ -18,6 +19,7 @@ export function Header({
   currentPath,
   onNavigate,
 }: HeaderProps) {
+  const { t } = useLanguage();
   const navigate = (event: MouseEvent<HTMLAnchorElement>, path: string) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
@@ -29,19 +31,19 @@ export function Header({
       <a
         className="brand"
         href="/"
-        aria-label="WikiGuide home"
+        aria-label={t("WikiGuide home")}
         onClick={(event) => navigate(event, "/")}
       >
         <span>WikiGuide</span>
       </a>
       <div className="header-actions">
-        <nav className="header-nav" aria-label="Primary navigation">
+        <nav className="header-nav" aria-label={t("Primary navigation")}>
           <a
             className={currentPath === "/projects" ? "is-active" : ""}
             href="/projects"
             onClick={(event) => navigate(event, "/projects")}
           >
-            Discover Wikimedia Projects
+            {t("Discover Wikimedia Projects")}
           </a>
           {user && (
             <a
@@ -49,23 +51,23 @@ export function Header({
               href="/dashboard"
               onClick={(event) => navigate(event, "/dashboard")}
             >
-              Dashboard
+              {t("Dashboard")}
             </a>
           )}
         </nav>
         <div className="auth-controls">
           {isLoading ? (
-            <span className="auth-loading">Checking session…</span>
+            <span className="auth-loading">{t("Checking session…")}</span>
           ) : user ? (
             <>
               <span className="auth-username">{user.username}</span>
               <button type="button" className="auth-button secondary" onClick={logout}>
-                Sign out
+                {t("Sign out")}
               </button>
             </>
           ) : (
             <a className="auth-button" href={getWikimediaLoginUrl()}>
-              Continue with Wikimedia
+              {t("Continue with Wikimedia")}
             </a>
           )}
         </div>

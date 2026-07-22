@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLanguage } from "../i18n/LanguageContext";
 
 interface FAQItem {
   question: string;
@@ -6,6 +7,7 @@ interface FAQItem {
 }
 
 export function FAQList({ items }: { items: FAQItem[] }) {
+  const { t } = useLanguage();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
@@ -21,14 +23,14 @@ export function FAQList({ items }: { items: FAQItem[] }) {
               aria-controls={`faq-answer-${index}`}
               onClick={() => setOpenIndex(isOpen ? null : index)}
             >
-              <span>{item.question}</span>
+              <span>{t(item.question)}</span>
               <span className="faq-icon" aria-hidden="true">
                 +
               </span>
             </button>
             {isOpen && (
               <p className="faq-answer" id={`faq-answer-${index}`}>
-                {item.answer}
+                {t(item.answer)}
               </p>
             )}
           </div>

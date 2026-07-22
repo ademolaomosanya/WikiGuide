@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "core",
+    "chatbot",
 ]
 
 MIDDLEWARE = [
@@ -95,7 +96,6 @@ WIKIMEDIA_USER_AGENT = os.getenv(
     "WIKIMEDIA_USER_AGENT",
     "WikiGuide/0.1 (https://github.com/your-org/wikiguide; contact@example.com)",
 )
-
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "False").lower() == "true"

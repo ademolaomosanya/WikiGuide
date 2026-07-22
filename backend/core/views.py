@@ -27,9 +27,18 @@ from .services.learning import (
 )
 from .services import oauth
 from .services.projects import get_wikimedia_projects
+from .services.wikimedia import (
+    TASKS as SUGGESTED_EDIT_TASKS,
+    TOPICS as SUGGESTED_EDIT_TOPICS,
+    WikimediaServiceError,
+    get_demo_suggested_edit,
+    get_suggested_edit,
+)
 
 OAUTH_STATE_SESSION_KEY = "wikimedia_oauth_state"
 OAUTH_VERIFIER_SESSION_KEY = "wikimedia_oauth_verifier"
+OAUTH_ACCESS_TOKEN_SESSION_KEY = "wikimedia_oauth_access_token"
+WIKIPEDIA_NOTIFICATIONS_URL = "https://fr.wikipedia.org/wiki/Special:Notifications"
 
 
 def _frontend_auth_redirect(result: str) -> HttpResponseRedirect:
@@ -49,6 +58,61 @@ def project_guides(request):
 @api_view(["GET"])
 def projects(request):
     return Response({"projects": get_wikimedia_projects()})
+
+
+@api_view(["GET"])
+def suggested_edit(request):
+    task_type = request.query_params.get("task", "copyedit")
+    topic = request.query_params.get("topic", "all")
+    try:
+        offset = max(0, int(request.query_params.get("offset", "0")))
+    except ValueError:
+        return Response({"detail": "Offset must be a non-negative integer."}, status=400)
+    if offset > 1000:
+        return Response({"detail": "Offset is outside the available suggestion range."}, status=400)
+
+    if task_type not in SUGGESTED_EDIT_TASKS:
+        return Response({"detail": "Unknown suggested-edit task type."}, status=400)
+    if topic not in SUGGESTED_EDIT_TOPICS:
+        return Response({"detail": "Unknown suggested-edit topic."}, status=400)
+
+    try:
+        return Response(get_suggested_edit(task_type, topic, offset))
+    except WikimediaServiceError:
+        return Response(get_demo_suggested_edit(task_type, topic))
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def notification_status(request):
+    access_token = request.session.get(OAUTH_ACCESS_TOKEN_SESSION_KEY)
+    if not access_token:
+        return Response(
+            {
+                "available": False,
+                "hasUnread": None,
+                "url": WIKIPEDIA_NOTIFICATIONS_URL,
+            }
+        )
+
+    try:
+        has_unread = oauth.has_unread_notifications(access_token)
+    except oauth.WikimediaOAuthError:
+        return Response(
+            {
+                "available": False,
+                "hasUnread": None,
+                "url": WIKIPEDIA_NOTIFICATIONS_URL,
+            }
+        )
+
+    return Response(
+        {
+            "available": True,
+            "hasUnread": has_unread,
+            "url": WIKIPEDIA_NOTIFICATIONS_URL,
+        }
+    )
 
 
 @api_view(["GET"])
@@ -212,6 +276,7 @@ def wikimedia_callback(request):
         account.save(update_fields=["username", "edit_count", "registered_at", "updated_at"])
 
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+    request.session[OAUTH_ACCESS_TOKEN_SESSION_KEY] = access_token
     return _frontend_auth_redirect("success")
 
 

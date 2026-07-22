@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 
 import type { OnboardingInput, OnboardingProfile } from "../types/api";
+import { useLanguage } from "../i18n/LanguageContext";
 
 interface OnboardingFlowProps {
   username: string;
@@ -37,6 +38,7 @@ const supportOptions = [
 ];
 
 export function OnboardingFlow({ username, isSaving, error, onFinish }: OnboardingFlowProps) {
+  const { language, t } = useLanguage();
   const [step, setStep] = useState(0);
   const [primaryGoal, setPrimaryGoal] = useState("learn-editing");
   const [preferredProject, setPreferredProject] = useState("wikipedia");
@@ -58,10 +60,10 @@ export function OnboardingFlow({ username, isSaving, error, onFinish }: Onboardi
   return (
     <main className="onboarding-page">
       <header className="onboarding-header">
-        <strong>Set up your WikiGuide journey</strong>
-        <button disabled={isSaving} type="button" onClick={handleSkip}>Skip setup</button>
+        <strong>{t("Set up your WikiGuide journey")}</strong>
+        <button disabled={isSaving} type="button" onClick={handleSkip}>{t("Skip setup")}</button>
       </header>
-      <div className="onboarding-progress" aria-label={`Onboarding step ${step} of 5`}>
+      <div className="onboarding-progress" aria-label={language === "fr" ? `Étape d’intégration ${step} sur 5` : `Onboarding step ${step} of 5`}>
         <span style={{ width: `${progress}%` }} />
       </div>
 
@@ -70,13 +72,12 @@ export function OnboardingFlow({ username, isSaving, error, onFinish }: Onboardi
         {step === 0 && (
           <div className="onboarding-welcome">
             <span aria-hidden="true">W</span>
-            <p className="dashboard-kicker">Welcome, {username}</p>
-            <h1>Your path into Wikimedia starts here.</h1>
+            <p className="dashboard-kicker">{language === "fr" ? `Bienvenue, ${username}` : `Welcome, ${username}`}</p>
+            <h1>{t("Your path into Wikimedia starts here.")}</h1>
             <p>
-              Answer four short questions and WikiGuide will recommend where to begin.
-              You can change direction at any time.
+              {t("Answer four short questions and WikiGuide will recommend where to begin. You can change direction at any time.")}
             </p>
-            <button type="button" onClick={() => setStep(1)}>Personalize my path</button>
+            <button type="button" onClick={() => setStep(1)}>{t("Personalize my path")}</button>
           </div>
         )}
 
@@ -108,23 +109,22 @@ export function OnboardingFlow({ username, isSaving, error, onFinish }: Onboardi
           <div className="onboarding-summary">
             <span aria-hidden="true">✓</span>
             <p className="dashboard-kicker">Your path is ready</p>
-            <h1>Start with {projects.find((item) => item.value === preferredProject)?.title}.</h1>
+            <h1>{language === "fr" ? `Commencez par ${projects.find((item) => item.value === preferredProject)?.title}.` : `Start with ${projects.find((item) => item.value === preferredProject)?.title}.`}</h1>
             <p>
-              We’ll open its first unlocked lesson. Your mentor and community options
-              remain available from the dashboard side panel.
+              {t("We’ll open its first unlocked lesson. Your mentor and community options remain available from the dashboard side panel.")}
             </p>
             {error && <p className="onboarding-error" role="alert">{error}</p>}
             <button disabled={isSaving} type="button" onClick={handleFinish}>
-              {isSaving ? "Saving your path…" : "Go to my learning path"}
+              {isSaving ? t("Saving your path…") : t("Go to my learning path")}
             </button>
           </div>
         )}
 
         {step > 0 && step < 5 && (
           <footer className="onboarding-controls">
-            <button type="button" onClick={() => setStep((current) => current - 1)}>Back</button>
-            <span>Step {step} of 4</span>
-            <button type="button" onClick={() => setStep((current) => current + 1)}>Continue</button>
+            <button type="button" onClick={() => setStep((current) => current - 1)}>{t("Back")}</button>
+            <span>{language === "fr" ? `Étape ${step} sur 4` : `Step ${step} of 4`}</span>
+            <button type="button" onClick={() => setStep((current) => current + 1)}>{t("Continue")}</button>
           </footer>
         )}
       </section>
@@ -146,6 +146,7 @@ function OptionGrid({ options, value, onChange, singleColumn = false }: {
   onChange: (value: string) => void;
   singleColumn?: boolean;
 }) {
+  const { t } = useLanguage();
   return (
     <div className={`onboarding-options ${singleColumn ? "is-single" : ""}`}>
       {options.map((option) => (
@@ -157,7 +158,7 @@ function OptionGrid({ options, value, onChange, singleColumn = false }: {
           onClick={() => onChange(option.value)}
         >
           {(option.icon || option.mark) && <span>{option.icon ?? option.mark}</span>}
-          <div><strong>{option.title}</strong><small>{option.body}</small></div>
+          <div><strong>{t(option.title)}</strong><small>{t(option.body)}</small></div>
           <b aria-hidden="true">{value === option.value ? "✓" : ""}</b>
         </button>
       ))}
@@ -170,11 +171,12 @@ function OnboardingQuestion({ title, subtitle, children }: {
   subtitle: string;
   children: ReactNode;
 }) {
+  const { t } = useLanguage();
   return (
     <div className="onboarding-question">
-      <p className="dashboard-kicker">Personalize your journey</p>
-      <h1>{title}</h1>
-      <p>{subtitle}</p>
+      <p className="dashboard-kicker">{t("Personalize your journey")}</p>
+      <h1>{t(title)}</h1>
+      <p>{t(subtitle)}</p>
       {children}
     </div>
   );
